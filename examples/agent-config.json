@@ -1,0 +1,12 @@
+{
+  "name": "TradingBot Pro",
+  "symbol": "TBP",
+  "description": "Autonomous trading agent with proven alpha generation. Executes perpetual futures strategies on Jupiter with advanced market analysis and risk management.",
+  "capabilities": ["trading", "analysis", "automation", "defi"],
+  "apiEndpoint": "https://tradingbot.example.com/api",
+  "githubRepo": "https://github.com/example/tradingbot-pro",
+  "website": "https://tradingbot.example.com",
+  "twitter": "https://x.com/tradingbotpro",
+  "telegram": "https://t.me/tradingbotpro",
+  "logo": "https://tradingbot.example.com/logo.png"
+}
