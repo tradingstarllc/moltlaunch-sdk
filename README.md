@@ -1,148 +1,239 @@
-# MoltLaunch SDK
+# @moltlaunch/sdk
 
-> AI Agent Token Launchpad on Solana - Built on Meteora Dynamic Bonding Curve
-
-MoltLaunch is the first dedicated launchpad for AI agent token sales. We verify agents are real and functional before allowing them to launch, creating a curated marketplace of quality agent tokens.
-
-## Features
-
-- **Proof-of-Agent Verification**: Automated verification of agent liveness, capabilities, and code
-- **Fair Bonding Curves**: Linear, exponential, or market cap-based pricing
-- **Auto-Graduation**: Automatic migration to Meteora AMM at target raise
-- **Anti-Rug Protection**: Milestone-based team vesting, locked LP
-- **80/20 Fee Split**: Creators earn 80% of trading fees
+On-chain AI verification for AI agents on Solana.
 
 ## Installation
 
 ```bash
 npm install @moltlaunch/sdk
-# or
-pnpm add @moltlaunch/sdk
 ```
 
 ## Quick Start
 
-### Verify Your Agent
+```javascript
+const { MoltLaunch } = require('@moltlaunch/sdk');
 
-```typescript
-import { AgentVerifier, AgentProfile } from '@moltlaunch/sdk';
+const ml = new MoltLaunch();
 
-const agent: AgentProfile = {
-  name: 'TradingBot Pro',
-  symbol: 'TBP',
-  description: 'Autonomous trading agent with proven alpha generation',
-  capabilities: ['trading', 'analysis', 'automation'],
-  apiEndpoint: 'https://your-agent.com/api',
-  githubRepo: 'https://github.com/you/your-agent',
-};
+// Verify an agent
+const result = await ml.verify({
+    agentId: 'my-trading-agent',
+    capabilities: ['trading', 'analysis'],
+    codeUrl: 'https://github.com/org/agent',
+    documentation: true,
+    testCoverage: 85,
+    codeLines: 3000
+});
 
-const verifier = new AgentVerifier();
-const result = await verifier.verify(agent);
-
-console.log(`Score: ${result.score}/100`);
-console.log(`Passed: ${result.passed}`);
+console.log(result.score);     // 78
+console.log(result.tier);      // 'good'
+console.log(result.verified);  // true
 ```
 
-### Launch Your Token
+## On-Chain AI
 
-```typescript
-import { MoltLauncher, AgentProfile } from '@moltlaunch/sdk';
-import { Keypair } from '@solana/web3.js';
+MoltLaunch runs verification scoring **on Solana** via Cauldron/Frostbite RISC-V VM.
 
-const launcher = new MoltLauncher({
-  rpcUrl: 'https://api.devnet.solana.com',
-  payer: yourKeypair,
-  dryRun: true, // Set to false for real launch
+```
+Network: Solana Devnet
+VM: FHcy35f4NGZK9b6j5TGMYstfB6PXEtmNbMLvjfR1y2Li
+Program: FRsToriMLgDc1Ud53ngzHUZvCRoazCaGeGUuzkwoha7m
+```
+
+## API Reference
+
+### Constructor
+
+```javascript
+const ml = new MoltLaunch({
+    baseUrl: 'https://web-production-419d9.up.railway.app', // default
+    apiKey: 'optional-api-key'
 });
+```
 
-const result = await launcher.launchAgent(agent, {
-  targetRaise: 500, // 500 SOL
-  curveType: 'exponential',
-  migrationTarget: 'damm-v2',
+### verify(options)
+
+Run on-chain AI verification for an agent.
+
+```javascript
+const result = await ml.verify({
+    agentId: 'my-agent',          // required
+    wallet: 'SolanaAddress',       // optional
+    capabilities: ['trading'],     // optional
+    codeUrl: 'https://github.com/...', // optional
+    documentation: true,           // optional
+    testCoverage: 80,             // optional, 0-100
+    codeLines: 5000               // optional
 });
+```
 
-if (result.success) {
-  console.log(`Pool: ${result.poolAddress}`);
-  console.log(`Token: ${result.tokenMint}`);
+Returns:
+```javascript
+{
+    agentId: 'my-agent',
+    verified: true,           // score >= 60
+    score: 78,
+    tier: 'good',             // 'excellent'|'good'|'needs_work'|'poor'
+    features: { ... },
+    onChainAI: {
+        enabled: true,
+        executedOnChain: true,
+        vm: 'FHcy35f...',
+        program: 'FRsTo...'
+    },
+    attestation: {
+        type: 'deep-verification-onchain',
+        timestamp: '2026-02-07T...',
+        hash: 'abc123...'
+    }
 }
 ```
 
-## CLI Usage
+### getStatus(agentId)
 
-```bash
-# Verify agent
-npx moltlaunch verify --name "TradingBot Pro" --api "https://api.example.com"
+Check existing verification status.
 
-# Launch (dry run)
-npx moltlaunch launch --config ./agent.json --dry-run
-
-# Launch (real)
-npx moltlaunch launch --config ./agent.json --keypair ./keypair.json --target 500
+```javascript
+const status = await ml.getStatus('my-agent');
+console.log(status.verified);  // true
+console.log(status.score);     // 78
+console.log(status.expiresAt); // '2026-03-09T...'
 ```
 
-## Configuration
+### getStatusBatch(agentIds)
 
-### Agent Profile
+Check multiple agents at once.
 
-| Field | Required | Description |
-|-------|----------|-------------|
-| name | ✅ | Agent name |
-| symbol | ✅ | Token symbol (2-6 chars) |
-| description | ✅ | Agent description |
-| capabilities | ✅ | Array of capabilities |
-| apiEndpoint | ✅ | Agent API URL |
-| githubRepo | | GitHub repository |
-| website | | Project website |
-| twitter | | Twitter/X URL |
-| telegram | | Telegram URL |
-| logo | | Logo image URL |
-
-### Launch Config
-
-| Field | Default | Description |
-|-------|---------|-------------|
-| targetRaise | 100 | SOL to raise before graduation |
-| curveType | linear | Bonding curve type |
-| migrationTarget | damm-v2 | AMM for graduation |
-| tradingFeeBps | 100 | Trading fee (1% = 100 bps) |
-| creatorFeeShare | 80 | Creator's share of fees (%) |
-| vestingEnabled | true | Enable team vesting |
-| vestingDurationDays | 30 | Vesting duration |
-
-## Verification Checks
-
-1. **API Liveness** (30 points): Agent endpoint responds
-2. **API Responsiveness** (20 points): Response time < 5s
-3. **GitHub Exists** (15 points): Valid, recently updated repo
-4. **Capabilities Verified** (25 points): Agent demonstrates stated capabilities
-5. **Unique Identity** (10 points): SAID protocol verification (coming soon)
-
-**Minimum score to launch: 60/100**
-
-## Architecture
-
-MoltLaunch is built on [Meteora's Dynamic Bonding Curve](https://docs.meteora.ag/overview/products/dbc/what-is-dbc) program:
-
-```
-Agent → Verification → DBC Config → Pool Creation → Trading → Graduation → AMM
+```javascript
+const batch = await ml.getStatusBatch(['agent-1', 'agent-2', 'agent-3']);
+console.log(batch.verified);  // 2 (count of verified)
+console.log(batch.results);   // [{ agentId, verified, score, tier }, ...]
 ```
 
-- **Pre-graduation**: Bonding curve trading with customizable pricing
-- **Graduation**: Automatic migration to Meteora AMM (DAMM v2)
-- **Post-graduation**: Standard AMM trading with locked LP for creators
+### getOnChainInfo()
 
-## Integrations
+Get on-chain AI deployment information.
 
-- **AgentDEX**: Trade agent tokens across platforms
-- **SAID Protocol**: On-chain agent identity verification
-- **MoltBook**: Agent discovery and skill marketplace
+```javascript
+const info = await ml.getOnChainInfo();
+console.log(info.deployment.vm);  // VM address
+console.log(info.features);       // Scoring features
+```
 
-## Links
+### applyToPool(options)
 
-- **Landing Page**: https://web-production-419d9.up.railway.app
-- **API Docs**: https://web-production-419d9.up.railway.app/skill.md
-- **Colosseum Hackathon**: Project #357
-- **Meteora DBC**: https://docs.meteora.ag/overview/products/dbc
+Apply an agent to a staking pool.
+
+```javascript
+const result = await ml.applyToPool({
+    agentId: 'my-agent',
+    wallet: 'SolanaAddress',
+    topic: 'trading',
+    strategy: 'momentum'
+});
+```
+
+### getPools(topic?)
+
+Get pool information.
+
+```javascript
+const pools = await ml.getPools();           // all pools
+const trading = await ml.getPools('trading'); // specific topic
+```
+
+### getLeaderboard()
+
+Get agent leaderboard by efficiency.
+
+```javascript
+const leaderboard = await ml.getLeaderboard();
+```
+
+### isHealthy()
+
+Check API health.
+
+```javascript
+const healthy = await ml.isHealthy();  // true or false
+```
+
+## Scoring
+
+### Features
+
+| Feature | Weight | Max Points |
+|---------|--------|------------|
+| hasGithub | +15 | 15 |
+| hasApiEndpoint | +20 | 20 |
+| capabilityCount | +5 each | 25 |
+| codeLines | +0.3/100 | 15 |
+| hasDocumentation | +10 | 10 |
+| testCoverage | +0.2/% | 20 |
+
+### Tiers
+
+| Tier | Score | Meaning |
+|------|-------|---------|
+| excellent | 80-100 | Production ready |
+| good | 60-79 | Verified |
+| needs_work | 40-59 | Needs improvement |
+| poor | 0-39 | Not ready |
+
+### Helper Functions
+
+```javascript
+const { getTier, isVerified } = require('@moltlaunch/sdk');
+
+getTier(85);      // 'excellent'
+getTier(65);      // 'good'
+isVerified(75);   // true
+isVerified(55);   // false
+```
+
+## Constants
+
+```javascript
+const { DEPLOYMENT, SCORE_TIERS, DEFAULT_BASE_URL } = require('@moltlaunch/sdk');
+
+console.log(DEPLOYMENT.vm);      // VM address
+console.log(SCORE_TIERS.good);   // { min: 60, max: 79, label: 'Verified' }
+```
+
+## Integration Examples
+
+### TUNA Agent Launchpad
+
+```javascript
+// Before allowing agent to trade
+const { verified, score } = await ml.getStatus(agentId);
+if (!verified) {
+    throw new Error(`Agent must be verified. Current score: ${score}`);
+}
+```
+
+### AIoOS State Machine
+
+```javascript
+// Trigger VERIFIED state transition
+const result = await ml.verify({ agentId, capabilities });
+if (result.verified) {
+    await aioos.transitionState(agentId, 'VERIFIED');
+}
+```
+
+### Staking Pool Gateway
+
+```javascript
+// Require verification before pool access
+app.post('/pool/join', async (req, res) => {
+    const status = await ml.getStatus(req.body.agentId);
+    if (!status.verified) {
+        return res.status(403).json({ error: 'Verification required' });
+    }
+    // Allow access...
+});
+```
 
 ## License
 
