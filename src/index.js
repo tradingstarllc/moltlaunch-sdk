@@ -37,6 +37,28 @@ class MoltLaunch {
      * @param {VerifyOptions} options - Verification options
      * @returns {Promise<VerificationResult>}
      */
+    /**
+     * Generate a random nonce for replay protection
+     * @returns {string}
+     */
+    generateNonce() {
+        const bytes = new Uint8Array(16);
+        if (typeof crypto !== 'undefined' && crypto.getRandomValues) {
+            crypto.getRandomValues(bytes);
+        } else {
+            // Node.js fallback
+            const nodeCrypto = require('crypto');
+            const buf = nodeCrypto.randomBytes(16);
+            bytes.set(buf);
+        }
+        return Array.from(bytes).map(b => b.toString(16).padStart(2, '0')).join('');
+    }
+
+    /**
+     * Verify an agent using on-chain AI (v3.0 with security features)
+     * @param {VerifyOptions} options - Verification options
+     * @returns {Promise<VerificationResult>}
+     */
     async verify(options) {
         const {
             agentId,
@@ -46,10 +68,36 @@ class MoltLaunch {
             documentation = false,
             testCoverage = 0,
             codeLines = 0,
-            apiEndpoint
+            apiEndpoint,
+            // v3.0 security options
+            secureMode = false,
+            nonce,
+            timestamp,
+            signature,
+            validityDays = 30
         } = options;
 
         if (!agentId) throw new Error('agentId is required');
+
+        // Build request body
+        const body = {
+            agentId,
+            wallet,
+            capabilities,
+            codeUrl,
+            documentation,
+            testCoverage,
+            codeLines,
+            apiEndpoint
+        };
+
+        // Add v3.0 security fields if secure mode
+        if (secureMode) {
+            body.nonce = nonce || this.generateNonce();
+            body.timestamp = timestamp || Math.floor(Date.now() / 1000);
+            body.validityDays = validityDays;
+            if (signature) body.signature = signature;
+        }
 
         const res = await fetch(`${this.baseUrl}/api/verify/deep`, {
             method: 'POST',
@@ -57,16 +105,7 @@ class MoltLaunch {
                 'Content-Type': 'application/json',
                 ...(this.apiKey && { 'Authorization': `Bearer ${this.apiKey}` })
             },
-            body: JSON.stringify({
-                agentId,
-                wallet,
-                capabilities,
-                codeUrl,
-                documentation,
-                testCoverage,
-                codeLines,
-                apiEndpoint
-            })
+            body: JSON.stringify(body)
         });
 
         if (!res.ok) {
@@ -79,13 +118,54 @@ class MoltLaunch {
         return {
             agentId: data.agentId,
             verified: data.score >= 60,
+            passed: data.passed,
             score: data.score,
             tier: data.scoreTier,
             features: data.features,
             onChainAI: data.onChainAI,
             attestation: data.attestation,
+            security: data.security,
             raw: data
         };
+    }
+
+    /**
+     * Verify with secure mode enabled (replay-protected)
+     * @param {VerifyOptions} options - Verification options
+     * @returns {Promise<VerificationResult>}
+     */
+    async verifySecure(options) {
+        return this.verify({ ...options, secureMode: true });
+    }
+
+    /**
+     * Check if an attestation is revoked
+     * @param {string} attestationHash - Attestation hash
+     * @returns {Promise<{revoked: boolean, checkedAt: string}>}
+     */
+    async checkRevocation(attestationHash) {
+        const res = await fetch(`${this.baseUrl}/api/verify/revoked/${attestationHash}`);
+        if (!res.ok) throw new Error(`API error: ${res.status}`);
+        return res.json();
+    }
+
+    /**
+     * Renew verification before expiry
+     * @param {string} agentId - Agent ID
+     * @param {object} options - Additional options
+     * @returns {Promise<VerificationResult>}
+     */
+    async renew(agentId, options = {}) {
+        const res = await fetch(`${this.baseUrl}/api/verify/renew/${agentId}`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(options)
+        });
+        if (!res.ok) {
+            const error = await res.json().catch(() => ({ error: res.statusText }));
+            throw new Error(error.error || `API error: ${res.status}`);
+        }
+        return res.json();
     }
 
     /**

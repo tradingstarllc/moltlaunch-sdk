@@ -1,6 +1,6 @@
 {
   "name": "@moltlaunch/sdk",
-  "version": "1.0.0",
+  "version": "2.0.0",
   "description": "MoltLaunch SDK - On-chain AI verification for AI agents",
   "main": "src/index.js",
   "types": "src/index.d.ts",
