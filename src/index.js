@@ -252,6 +252,238 @@ class MoltLaunch {
             return false;
         }
     }
+
+    // ==========================================
+    // STARK PROOFS (v3.3 - Privacy-Preserving)
+    // ==========================================
+
+    /**
+     * Generate a STARK threshold proof
+     * Proves "score >= threshold" without revealing exact score
+     * @param {string} agentId - Agent ID
+     * @param {object} options - Proof options
+     * @param {number} [options.threshold=60] - Minimum score to prove
+     * @returns {Promise<STARKProof>}
+     */
+    async generateProof(agentId, options = {}) {
+        const { threshold = 60 } = options;
+        
+        const res = await fetch(`${this.baseUrl}/api/stark/generate/${encodeURIComponent(agentId)}`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ threshold })
+        });
+        
+        if (!res.ok) {
+            const error = await res.json().catch(() => ({ error: res.statusText }));
+            throw new Error(error.error || `API error: ${res.status}`);
+        }
+        
+        return res.json();
+    }
+
+    /**
+     * Generate a consistency proof
+     * Proves "maintained >= threshold for N periods" without revealing individual scores
+     * @param {string} agentId - Agent ID
+     * @param {object} options - Proof options
+     * @param {number} [options.threshold=60] - Minimum score threshold
+     * @param {number} [options.days=30] - Number of days to prove
+     * @returns {Promise<ConsistencyProof>}
+     */
+    async generateConsistencyProof(agentId, options = {}) {
+        const { threshold = 60, days = 30 } = options;
+        
+        const res = await fetch(`${this.baseUrl}/api/stark/consistency/${encodeURIComponent(agentId)}`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ threshold, days })
+        });
+        
+        if (!res.ok) {
+            const error = await res.json().catch(() => ({ error: res.statusText }));
+            throw new Error(error.error || `API error: ${res.status}`);
+        }
+        
+        return res.json();
+    }
+
+    /**
+     * Generate a streak proof
+     * Proves "N+ consecutive periods at >= threshold"
+     * @param {string} agentId - Agent ID
+     * @param {object} options - Proof options
+     * @param {number} [options.threshold=60] - Minimum score threshold
+     * @param {number} [options.minStreak=7] - Minimum consecutive periods
+     * @returns {Promise<StreakProof>}
+     */
+    async generateStreakProof(agentId, options = {}) {
+        const { threshold = 60, minStreak = 7 } = options;
+        
+        const res = await fetch(`${this.baseUrl}/api/stark/streak/${encodeURIComponent(agentId)}`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ threshold, minStreak })
+        });
+        
+        if (!res.ok) {
+            const error = await res.json().catch(() => ({ error: res.statusText }));
+            throw new Error(error.error || `API error: ${res.status}`);
+        }
+        
+        return res.json();
+    }
+
+    /**
+     * Generate a stability proof
+     * Proves "score variance <= threshold" without revealing actual variance
+     * @param {string} agentId - Agent ID
+     * @param {object} options - Proof options
+     * @param {number} [options.maxVariance=100] - Maximum allowed variance
+     * @returns {Promise<StabilityProof>}
+     */
+    async generateStabilityProof(agentId, options = {}) {
+        const { maxVariance = 100 } = options;
+        
+        const res = await fetch(`${this.baseUrl}/api/stark/stability/${encodeURIComponent(agentId)}`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ maxVariance })
+        });
+        
+        if (!res.ok) {
+            const error = await res.json().catch(() => ({ error: res.statusText }));
+            throw new Error(error.error || `API error: ${res.status}`);
+        }
+        
+        return res.json();
+    }
+
+    // ==========================================
+    // EXECUTION TRACES (Behavioral Scoring)
+    // ==========================================
+
+    /**
+     * Submit an execution trace for behavioral scoring
+     * @param {string} agentId - Agent ID
+     * @param {TraceData} data - Trace data
+     * @returns {Promise<TraceResult>}
+     */
+    async submitTrace(agentId, data) {
+        const res = await fetch(`${this.baseUrl}/api/traces`, {
+            method: 'POST',
+            headers: { 
+                'Content-Type': 'application/json',
+                ...(this.apiKey && { 'Authorization': `Bearer ${this.apiKey}` })
+            },
+            body: JSON.stringify({ agentId, ...data })
+        });
+        
+        if (!res.ok) {
+            const error = await res.json().catch(() => ({ error: res.statusText }));
+            throw new Error(error.error || `API error: ${res.status}`);
+        }
+        
+        return res.json();
+    }
+
+    /**
+     * Get traces for an agent
+     * @param {string} agentId - Agent ID
+     * @param {object} [options] - Query options
+     * @returns {Promise<TraceList>}
+     */
+    async getTraces(agentId, options = {}) {
+        const { limit = 20 } = options;
+        const res = await fetch(`${this.baseUrl}/api/traces/${encodeURIComponent(agentId)}?limit=${limit}`);
+        if (!res.ok) throw new Error(`API error: ${res.status}`);
+        return res.json();
+    }
+
+    /**
+     * Get behavioral score from traces
+     * @param {string} agentId - Agent ID
+     * @returns {Promise<BehavioralScore>}
+     */
+    async getBehavioralScore(agentId) {
+        const res = await fetch(`${this.baseUrl}/api/traces/${encodeURIComponent(agentId)}/score`);
+        if (!res.ok) throw new Error(`API error: ${res.status}`);
+        return res.json();
+    }
+
+    /**
+     * Anchor a trace on-chain (requires SlotScribe integration)
+     * @param {string} traceId - Trace ID
+     * @returns {Promise<AnchorResult>}
+     */
+    async anchorTrace(traceId) {
+        const res = await fetch(`${this.baseUrl}/api/traces/${encodeURIComponent(traceId)}/anchor`, {
+            method: 'POST',
+            headers: { 
+                'Content-Type': 'application/json',
+                ...(this.apiKey && { 'Authorization': `Bearer ${this.apiKey}` })
+            }
+        });
+        
+        if (!res.ok) {
+            const error = await res.json().catch(() => ({ error: res.statusText }));
+            throw new Error(error.error || `API error: ${res.status}`);
+        }
+        
+        return res.json();
+    }
+
+    // ==========================================
+    // HELPER METHODS
+    // ==========================================
+
+    /**
+     * Quick check if an agent is verified
+     * @param {string} agentId - Agent ID
+     * @returns {Promise<boolean>}
+     */
+    async isVerified(agentId) {
+        try {
+            const status = await this.getStatus(agentId);
+            return status.verified === true && status.score >= 60;
+        } catch {
+            return false;
+        }
+    }
+
+    /**
+     * Check if an agent has a specific capability at a minimum score
+     * @param {string} agentId - Agent ID
+     * @param {string} capability - Capability to check (e.g., "trading", "escrow")
+     * @param {number} [minScore=60] - Minimum score required
+     * @returns {Promise<boolean>}
+     */
+    async checkCapability(agentId, capability, minScore = 60) {
+        try {
+            const status = await this.getStatus(agentId);
+            if (!status.verified || status.score < minScore) return false;
+            if (!status.capabilities) return status.score >= minScore;
+            return status.capabilities.includes(capability) && status.score >= minScore;
+        } catch {
+            return false;
+        }
+    }
+
+    /**
+     * Get proof generation cost estimate
+     * @param {string} proofType - Type of proof (threshold, consistency, streak, stability)
+     * @returns {Promise<CostEstimate>}
+     */
+    async getProofCost(proofType = 'threshold') {
+        // Costs are near-zero for these lightweight proofs
+        const costs = {
+            threshold: { computeMs: 50, estimatedCost: '$0.001' },
+            consistency: { computeMs: 120, estimatedCost: '$0.002' },
+            streak: { computeMs: 100, estimatedCost: '$0.002' },
+            stability: { computeMs: 80, estimatedCost: '$0.001' }
+        };
+        return costs[proofType] || costs.threshold;
+    }
 }
 
 // Scoring helpers
