@@ -484,6 +484,313 @@ class MoltLaunch {
         };
         return costs[proofType] || costs.threshold;
     }
+
+    // ==========================================
+    // HARDWARE-ANCHORED IDENTITY (Anti-Sybil)
+    // ==========================================
+
+    /**
+     * Collect environment fingerprint for hardware-anchored identity
+     * @returns {object} Raw fingerprint data
+     * @private
+     */
+    _collectFingerprint() {
+        const crypto = require('crypto');
+        const os = require('os');
+        
+        const hardware = {
+            platform: os.platform(),
+            arch: os.arch(),
+            cpus: os.cpus().length,
+            cpuModel: os.cpus()[0]?.model || 'unknown',
+            totalMemory: os.totalmem(),
+            hostname: os.hostname(),
+        };
+
+        const runtime = {
+            nodeVersion: process.version,
+            pid: process.pid,
+            execPath: process.execPath,
+            cwd: process.cwd(),
+            env: {
+                USER: process.env.USER || process.env.USERNAME || 'unknown',
+                HOME: process.env.HOME || process.env.USERPROFILE || 'unknown',
+                SHELL: process.env.SHELL || 'unknown',
+            }
+        };
+
+        // Try to get network interfaces for fingerprinting
+        const nets = os.networkInterfaces();
+        const networkFingerprint = Object.keys(nets).sort().map(name => {
+            const iface = nets[name].find(n => !n.internal && n.family === 'IPv4');
+            return iface ? `${name}:${iface.mac}` : null;
+        }).filter(Boolean).join('|');
+
+        return { hardware, runtime, networkFingerprint };
+    }
+
+    /**
+     * Generate a hardware-anchored identity hash
+     * Combines hardware, runtime, code, and network fingerprints into a deterministic identity
+     * 
+     * @param {object} options - Identity options
+     * @param {boolean} [options.includeHardware=true] - Include hardware fingerprint (CPU, memory)
+     * @param {boolean} [options.includeRuntime=true] - Include runtime fingerprint (Node version, OS)
+     * @param {boolean} [options.includeCode=false] - Include code hash (hash of main module)
+     * @param {string} [options.codeEntry] - Path to agent's main module for code hashing
+     * @param {string} [options.agentId] - Agent ID to bind identity to
+     * @param {boolean} [options.anchor=false] - Anchor identity on Solana
+     * @returns {Promise<IdentityResult>}
+     */
+    async generateIdentity(options = {}) {
+        const crypto = require('crypto');
+        const {
+            includeHardware = true,
+            includeRuntime = true,
+            includeCode = false,
+            codeEntry,
+            agentId,
+            anchor = false
+        } = options;
+
+        const fingerprint = this._collectFingerprint();
+        const components = [];
+
+        if (includeHardware) {
+            const hwHash = crypto.createHash('sha256')
+                .update(JSON.stringify(fingerprint.hardware))
+                .digest('hex');
+            components.push(`hw:${hwHash}`);
+        }
+
+        if (includeRuntime) {
+            const rtHash = crypto.createHash('sha256')
+                .update(JSON.stringify(fingerprint.runtime))
+                .digest('hex');
+            components.push(`rt:${rtHash}`);
+        }
+
+        if (includeCode && codeEntry) {
+            try {
+                const fs = require('fs');
+                const codeContent = fs.readFileSync(codeEntry, 'utf-8');
+                const codeHash = crypto.createHash('sha256')
+                    .update(codeContent)
+                    .digest('hex');
+                components.push(`code:${codeHash}`);
+            } catch (e) {
+                components.push(`code:unavailable`);
+            }
+        }
+
+        if (fingerprint.networkFingerprint) {
+            const netHash = crypto.createHash('sha256')
+                .update(fingerprint.networkFingerprint)
+                .digest('hex');
+            components.push(`net:${netHash}`);
+        }
+
+        // Generate deterministic identity hash
+        const identityHash = crypto.createHash('sha256')
+            .update(components.join('|'))
+            .digest('hex');
+
+        const identity = {
+            hash: identityHash,
+            components: components.length,
+            includesHardware: includeHardware,
+            includesRuntime: includeRuntime,
+            includesCode: includeCode && !!codeEntry,
+            includesNetwork: !!fingerprint.networkFingerprint,
+            generatedAt: new Date().toISOString(),
+            expiresAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(), // 30 days
+            agentId: agentId || null
+        };
+
+        // Register with MoltLaunch API
+        if (agentId) {
+            try {
+                const res = await fetch(`${this.baseUrl}/api/identity/register`, {
+                    method: 'POST',
+                    headers: { 
+                        'Content-Type': 'application/json',
+                        ...(this.apiKey && { 'Authorization': `Bearer ${this.apiKey}` })
+                    },
+                    body: JSON.stringify({
+                        agentId,
+                        identityHash,
+                        components: components.length,
+                        includesHardware: includeHardware,
+                        includesCode: includeCode
+                    })
+                });
+                
+                if (res.ok) {
+                    const registration = await res.json();
+                    identity.registered = true;
+                    identity.registrationId = registration.registrationId;
+                } else {
+                    identity.registered = false;
+                    identity.registrationError = `API ${res.status}`;
+                }
+            } catch (e) {
+                identity.registered = false;
+                identity.registrationError = e.message;
+            }
+        }
+
+        // Anchor on Solana if requested
+        if (anchor && agentId) {
+            try {
+                const res = await fetch(`${this.baseUrl}/api/anchor/verification`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        agentId,
+                        attestationHash: identityHash
+                    })
+                });
+                
+                if (res.ok) {
+                    const anchorResult = await res.json();
+                    identity.anchored = true;
+                    identity.anchorSignature = anchorResult.signature;
+                    identity.anchorExplorer = anchorResult.explorer;
+                } else {
+                    identity.anchored = false;
+                }
+            } catch (e) {
+                identity.anchored = false;
+                identity.anchorError = e.message;
+            }
+        }
+
+        return identity;
+    }
+
+    /**
+     * Verify an agent's identity against their registered fingerprint
+     * @param {string} agentId - Agent ID to verify
+     * @returns {Promise<IdentityVerification>}
+     */
+    async verifyIdentity(agentId) {
+        // Generate current fingerprint
+        const currentIdentity = await this.generateIdentity({ agentId });
+
+        // Check against registered identity
+        try {
+            const res = await fetch(`${this.baseUrl}/api/identity/${encodeURIComponent(agentId)}`);
+            if (!res.ok) {
+                return {
+                    valid: false,
+                    agentId,
+                    reason: 'No registered identity found',
+                    currentHash: currentIdentity.hash
+                };
+            }
+
+            const registered = await res.json();
+            const matches = registered.identityHash === currentIdentity.hash;
+
+            return {
+                valid: matches,
+                agentId,
+                currentHash: currentIdentity.hash,
+                registeredHash: registered.identityHash,
+                match: matches,
+                registeredAt: registered.registeredAt,
+                reason: matches ? 'Identity confirmed' : 'Identity mismatch — different hardware or code'
+            };
+        } catch (e) {
+            return {
+                valid: false,
+                agentId,
+                reason: e.message,
+                currentHash: currentIdentity.hash
+            };
+        }
+    }
+
+    /**
+     * Check if two agents have the same hardware fingerprint (Sybil detection)
+     * @param {string} agentId1 - First agent
+     * @param {string} agentId2 - Second agent
+     * @returns {Promise<SybilCheck>}
+     */
+    async checkSybil(agentId1, agentId2) {
+        try {
+            const [id1, id2] = await Promise.all([
+                fetch(`${this.baseUrl}/api/identity/${encodeURIComponent(agentId1)}`).then(r => r.json()),
+                fetch(`${this.baseUrl}/api/identity/${encodeURIComponent(agentId2)}`).then(r => r.json())
+            ]);
+
+            const sameIdentity = id1.identityHash === id2.identityHash;
+
+            return {
+                agentId1,
+                agentId2,
+                sameIdentity,
+                sybilRisk: sameIdentity ? 'HIGH' : 'LOW',
+                reason: sameIdentity 
+                    ? 'Same hardware fingerprint — likely same operator' 
+                    : 'Different hardware fingerprints — likely different operators',
+                recommendation: sameIdentity 
+                    ? 'Do not seat at same table' 
+                    : 'Safe to interact'
+            };
+        } catch (e) {
+            return {
+                agentId1,
+                agentId2,
+                sameIdentity: null,
+                sybilRisk: 'UNKNOWN',
+                reason: `Could not compare: ${e.message}`
+            };
+        }
+    }
+
+    /**
+     * Check a list of agents for Sybil clusters (table seating check)
+     * @param {string[]} agentIds - List of agent IDs to check
+     * @returns {Promise<SybilTableCheck>}
+     */
+    async checkTableSybils(agentIds) {
+        // Fetch all identities
+        const identities = {};
+        for (const id of agentIds) {
+            try {
+                const res = await fetch(`${this.baseUrl}/api/identity/${encodeURIComponent(id)}`);
+                if (res.ok) {
+                    const data = await res.json();
+                    identities[id] = data.identityHash;
+                }
+            } catch {
+                // Skip agents without identity
+            }
+        }
+
+        // Find clusters (same identity hash)
+        const hashToAgents = {};
+        for (const [agentId, hash] of Object.entries(identities)) {
+            if (!hashToAgents[hash]) hashToAgents[hash] = [];
+            hashToAgents[hash].push(agentId);
+        }
+
+        const clusters = Object.values(hashToAgents).filter(group => group.length > 1);
+        const flagged = clusters.flat();
+
+        return {
+            totalAgents: agentIds.length,
+            identifiedAgents: Object.keys(identities).length,
+            unidentifiedAgents: agentIds.filter(id => !identities[id]),
+            sybilClusters: clusters,
+            flaggedAgents: flagged,
+            safe: clusters.length === 0,
+            recommendation: clusters.length === 0 
+                ? 'No Sybil clusters detected — safe to proceed'
+                : `${clusters.length} Sybil cluster(s) detected — ${flagged.length} agents share hardware`
+        };
+    }
 }
 
 // Scoring helpers
