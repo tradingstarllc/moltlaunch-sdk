@@ -487,6 +487,7 @@ class MoltLaunch {
 
     // ==========================================
     // HARDWARE-ANCHORED IDENTITY (Anti-Sybil)
+    // DePIN-Rooted Device Identity
     // ==========================================
 
     /**
@@ -530,6 +531,101 @@ class MoltLaunch {
     }
 
     /**
+     * Try to read TPM endorsement key hash for hardware-rooted identity
+     * @returns {string|null} SHA-256 hash of TPM data, or null if unavailable
+     * @private
+     */
+    _getTPMFingerprint() {
+        const crypto = require('crypto');
+        const fs = require('fs');
+        const os = require('os');
+        
+        // TPM 2.0 paths (Linux)
+        const tpmPaths = [
+            '/sys/class/tpm/tpm0/device/description',
+            '/sys/class/tpm/tpm0/tpm_version_major',
+            '/sys/class/dmi/id/board_serial',
+            '/sys/class/dmi/id/product_uuid',
+            '/sys/class/dmi/id/chassis_serial',
+        ];
+        
+        const tpmData = [];
+        for (const p of tpmPaths) {
+            try {
+                const data = fs.readFileSync(p, 'utf-8').trim();
+                if (data && data !== 'None' && data !== '') {
+                    tpmData.push(data);
+                }
+            } catch {}
+        }
+        
+        // macOS: use IOPlatformUUID
+        if (os.platform() === 'darwin') {
+            try {
+                const { execSync } = require('child_process');
+                const uuid = execSync('ioreg -rd1 -c IOPlatformExpertDevice | grep IOPlatformUUID', { encoding: 'utf-8' });
+                const match = uuid.match(/"([A-F0-9-]+)"/);
+                if (match) tpmData.push(match[1]);
+            } catch {}
+        }
+        
+        if (tpmData.length === 0) return null;
+        
+        return crypto.createHash('sha256')
+            .update(tpmData.join('|'))
+            .digest('hex');
+    }
+
+    /**
+     * Register a DePIN device attestation for hardware-rooted identity
+     * Links agent identity to a physically verified DePIN device
+     * 
+     * @param {object} options - DePIN registration options
+     * @param {string} options.provider - DePIN provider name (e.g., 'io.net', 'akash', 'render')
+     * @param {string} options.deviceId - Device ID from the DePIN provider
+     * @param {string} [options.attestation] - Optional attestation data from the provider
+     * @param {string} options.agentId - Agent ID to bind DePIN identity to
+     * @returns {Promise<DePINRegistrationResult>}
+     */
+    async registerDePINDevice(options = {}) {
+        const { provider, deviceId, attestation, agentId } = options;
+        
+        const supported = ['io.net', 'akash', 'render', 'helium', 'hivemapper', 'nosana'];
+        
+        if (!supported.includes(provider)) {
+            throw new Error(`Unsupported DePIN provider. Supported: ${supported.join(', ')}`);
+        }
+        
+        const res = await fetch(`${this.baseUrl}/api/identity/depin`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                agentId,
+                depinProvider: provider,
+                deviceId,
+                attestation,
+                timestamp: Date.now()
+            })
+        });
+        
+        if (!res.ok) throw new Error(`DePIN registration failed: ${res.status}`);
+        return res.json();
+    }
+
+    /**
+     * Get identity trust report for an agent
+     * Shows trust ladder breakdown including DePIN and TPM attestation levels
+     * 
+     * @param {string} agentId - Agent ID to get report for
+     * @returns {Promise<IdentityReport>}
+     */
+    async getIdentityReport(agentId) {
+        const res = await fetch(`${this.baseUrl}/api/identity/${encodeURIComponent(agentId)}/report`);
+        if (!res.ok) throw new Error(`API error: ${res.status}`);
+        return res.json();
+    }
+
+    /**
      * Generate a hardware-anchored identity hash
      * Combines hardware, runtime, code, and network fingerprints into a deterministic identity
      * 
@@ -548,6 +644,9 @@ class MoltLaunch {
             includeHardware = true,
             includeRuntime = true,
             includeCode = false,
+            includeTPM = false,
+            depinProvider,
+            depinDeviceId,
             codeEntry,
             agentId,
             anchor = false
@@ -590,6 +689,23 @@ class MoltLaunch {
             components.push(`net:${netHash}`);
         }
 
+        // TPM attestation (hardware-rooted identity - trust level 4)
+        let tpmHash = null;
+        if (includeTPM) {
+            tpmHash = this._getTPMFingerprint();
+            if (tpmHash) {
+                components.push(`tpm:${tpmHash}`);
+            }
+        }
+
+        // DePIN device attestation (highest trust level 5)
+        if (depinProvider && depinDeviceId) {
+            const depinHash = crypto.createHash('sha256')
+                .update(`depin:${depinProvider}:${depinDeviceId}`)
+                .digest('hex');
+            components.push(`depin:${depinHash}`);
+        }
+
         // Generate deterministic identity hash
         const identityHash = crypto.createHash('sha256')
             .update(components.join('|'))
@@ -602,6 +718,10 @@ class MoltLaunch {
             includesRuntime: includeRuntime,
             includesCode: includeCode && !!codeEntry,
             includesNetwork: !!fingerprint.networkFingerprint,
+            includesTPM: includeTPM && !!tpmHash,
+            tpmHash: tpmHash || null,
+            depinProvider: depinProvider || null,
+            depinDeviceId: depinDeviceId || null,
             generatedAt: new Date().toISOString(),
             expiresAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(), // 30 days
             agentId: agentId || null
