@@ -338,7 +338,12 @@ const info = await ml.getOnChainInfo();
 
 ## Changelog
 
-### v2.3.0 (Current)
+### v2.4.0 (Current)
+- `_getTPMAttestation(challenge)` — Real TPM challenge-response
+- `verifyTPM(agentId)` — Full challenge-response flow
+- Updated DePIN registration with devicePDA verification
+
+### v2.3.0
 - `_getTPMFingerprint()` — TPM 2.0 hardware attestation
 - `registerDePINDevice()` — DePIN provider registration
 - `getIdentityReport()` — Trust ladder breakdown
