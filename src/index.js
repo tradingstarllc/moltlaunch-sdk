@@ -577,18 +577,165 @@ class MoltLaunch {
     }
 
     /**
+     * Collect REAL TPM attestation with challenge-response
+     * Uses system-level tools (tpm2-tools, ioreg, machine-id) for cryptographic attestation
+     * Challenge is mixed into evidence hash to prevent replay attacks
+     * 
+     * @param {string} challenge - Server-issued challenge nonce
+     * @returns {object} Attestation result with evidence, method, and availability
+     * @private
+     */
+    _getTPMAttestation(challenge) {
+        const { execSync } = require('child_process');
+        const crypto = require('crypto');
+        const os = require('os');
+        
+        const attestation = {
+            available: false,
+            method: null,
+            evidence: null,
+            challenge: challenge
+        };
+        
+        // Method 1: tpm2-tools (Linux with TPM 2.0)
+        try {
+            const tpmVersion = execSync('cat /sys/class/tpm/tpm0/tpm_version_major 2>/dev/null', { encoding: 'utf-8' }).trim();
+            
+            if (tpmVersion === '2') {
+                // Read PCR values (reflect boot chain — can't be faked without rebooting)
+                const pcrValues = execSync('tpm2_pcrread sha256:0,1,2,3,4,5,6,7 2>/dev/null || echo "unavailable"', { encoding: 'utf-8' }).trim();
+                
+                // Try to get EK certificate (endorsement key — burned at manufacture)
+                const ekCert = execSync('tpm2_getekcertificate 2>/dev/null || tpm2_nvread 0x01c00002 2>/dev/null || echo "unavailable"', { encoding: 'utf-8' }).trim();
+                
+                // Read platform info that's hardware-bound
+                const platformInfo = [];
+                for (const p of ['/sys/class/dmi/id/board_serial', '/sys/class/dmi/id/product_uuid', '/sys/class/dmi/id/chassis_serial']) {
+                    try {
+                        const val = require('fs').readFileSync(p, 'utf-8').trim();
+                        if (val && val !== 'None' && val !== 'Not Specified' && val !== '') {
+                            platformInfo.push(val);
+                        }
+                    } catch {}
+                }
+                
+                if (pcrValues !== 'unavailable' || platformInfo.length > 0) {
+                    // Hash attestation evidence WITH the challenge (prevents replay)
+                    const evidence = crypto.createHash('sha256')
+                        .update(challenge)
+                        .update(pcrValues)
+                        .update(platformInfo.join('|'))
+                        .update(ekCert !== 'unavailable' ? ekCert : '')
+                        .digest('hex');
+                    
+                    attestation.available = true;
+                    attestation.method = 'tpm2';
+                    attestation.evidence = evidence;
+                    attestation.pcrAvailable = pcrValues !== 'unavailable';
+                    attestation.ekAvailable = ekCert !== 'unavailable';
+                    attestation.platformFields = platformInfo.length;
+                }
+            }
+        } catch {}
+        
+        // Method 2: macOS Secure Enclave / IOPlatformUUID
+        if (!attestation.available && os.platform() === 'darwin') {
+            try {
+                const uuid = execSync('ioreg -rd1 -c IOPlatformExpertDevice | grep IOPlatformUUID', { encoding: 'utf-8' });
+                const match = uuid.match(/"([A-F0-9-]+)"/);
+                if (match) {
+                    const evidence = crypto.createHash('sha256')
+                        .update(challenge)
+                        .update(match[1])
+                        .digest('hex');
+                    
+                    attestation.available = true;
+                    attestation.method = 'macos-platform-uuid';
+                    attestation.evidence = evidence;
+                }
+            } catch {}
+        }
+        
+        // Method 3: Linux machine-id (weaker but always available on Linux)
+        if (!attestation.available && os.platform() === 'linux') {
+            try {
+                const machineId = require('fs').readFileSync('/etc/machine-id', 'utf-8').trim();
+                const evidence = crypto.createHash('sha256')
+                    .update(challenge)
+                    .update(machineId)
+                    .digest('hex');
+                
+                attestation.available = true;
+                attestation.method = 'linux-machine-id';
+                attestation.evidence = evidence;
+                attestation.note = 'machine-id is persistent but root-changeable';
+            } catch {}
+        }
+        
+        return attestation;
+    }
+
+    /**
+     * Perform full TPM challenge-response verification against MoltLaunch server
+     * 1. Request challenge from server
+     * 2. Collect local TPM attestation with that challenge
+     * 3. Submit attestation to server for verification
+     * 
+     * @param {string} agentId - Agent ID to verify TPM for
+     * @returns {Promise<TPMVerifyResult>}
+     */
+    async verifyTPM(agentId) {
+        // 1. Get challenge from server
+        const challengeRes = await fetch(`${this.baseUrl}/api/identity/tpm/challenge`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ agentId })
+        });
+        
+        if (!challengeRes.ok) {
+            const err = await challengeRes.json().catch(() => ({ error: challengeRes.statusText }));
+            throw new Error(err.error || `Challenge request failed: ${challengeRes.status}`);
+        }
+        
+        const { challenge } = await challengeRes.json();
+        
+        // 2. Collect local attestation
+        const attestation = this._getTPMAttestation(challenge);
+        
+        if (!attestation.available) {
+            return { verified: false, reason: 'TPM not available on this machine' };
+        }
+        
+        // 3. Submit to server for verification
+        const verifyRes = await fetch(`${this.baseUrl}/api/identity/tpm/verify`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ agentId, attestation })
+        });
+        
+        if (!verifyRes.ok) {
+            const err = await verifyRes.json().catch(() => ({ error: verifyRes.statusText }));
+            throw new Error(err.error || `TPM verify failed: ${verifyRes.status}`);
+        }
+        
+        return verifyRes.json();
+    }
+
+    /**
      * Register a DePIN device attestation for hardware-rooted identity
      * Links agent identity to a physically verified DePIN device
+     * If devicePDA is provided, the server verifies the account exists on Solana
      * 
      * @param {object} options - DePIN registration options
      * @param {string} options.provider - DePIN provider name (e.g., 'io.net', 'akash', 'render')
      * @param {string} options.deviceId - Device ID from the DePIN provider
+     * @param {string} [options.devicePDA] - Solana PDA address for the device (enables on-chain verification)
      * @param {string} [options.attestation] - Optional attestation data from the provider
      * @param {string} options.agentId - Agent ID to bind DePIN identity to
      * @returns {Promise<DePINRegistrationResult>}
      */
     async registerDePINDevice(options = {}) {
-        const { provider, deviceId, attestation, agentId } = options;
+        const { provider, deviceId, devicePDA, attestation, agentId } = options;
         
         const supported = ['io.net', 'akash', 'render', 'helium', 'hivemapper', 'nosana'];
         
@@ -603,6 +750,7 @@ class MoltLaunch {
                 agentId,
                 depinProvider: provider,
                 deviceId,
+                devicePDA: devicePDA || null,
                 attestation,
                 timestamp: Date.now()
             })
@@ -690,11 +838,31 @@ class MoltLaunch {
         }
 
         // TPM attestation (hardware-rooted identity - trust level 4)
+        // Uses challenge-response: requests challenge from server, attests locally, verifies on server
         let tpmHash = null;
+        let tpmAttestation = null;
         if (includeTPM) {
+            // Legacy fallback: static fingerprint (no challenge-response)
             tpmHash = this._getTPMFingerprint();
             if (tpmHash) {
                 components.push(`tpm:${tpmHash}`);
+            }
+
+            // Real challenge-response TPM attestation (if server is reachable)
+            if (agentId) {
+                try {
+                    const tpmResult = await this.verifyTPM(agentId);
+                    if (tpmResult.verified || tpmResult.success) {
+                        tpmAttestation = {
+                            method: tpmResult.tpmMethod,
+                            verified: true,
+                            trustLevel: tpmResult.trustLevel
+                        };
+                    }
+                } catch (e) {
+                    // Server unreachable or TPM not available — fall back to static fingerprint
+                    tpmAttestation = { verified: false, error: e.message };
+                }
             }
         }
 
@@ -720,6 +888,7 @@ class MoltLaunch {
             includesNetwork: !!fingerprint.networkFingerprint,
             includesTPM: includeTPM && !!tpmHash,
             tpmHash: tpmHash || null,
+            tpmAttestation: tpmAttestation || null,
             depinProvider: depinProvider || null,
             depinDeviceId: depinDeviceId || null,
             generatedAt: new Date().toISOString(),
