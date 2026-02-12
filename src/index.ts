@@ -1,68 +1,71 @@
-// MoltLaunch SDK - AI Agent Token Launches on Solana
-// Built on Meteora Dynamic Bonding Curve (DBC)
-
-export * from './types';
-export * from './verification';
-export * from './launcher';
-
-import { MoltLauncher, LaunchOptions, quickLaunch } from './launcher';
-import { AgentVerifier, verifier } from './verification';
-import {
-  AgentProfile,
-  LaunchConfig,
-  VerificationResult,
-  LaunchResult,
-  MOLTLAUNCH_CONFIG,
-  DBC_PROGRAM_ID,
-} from './types';
-
 /**
- * MoltLaunch SDK
- * 
- * The first dedicated launchpad for AI agent token sales on Solana.
- * Built on Meteora's Dynamic Bonding Curve for fair, transparent launches.
- * 
- * Features:
- * - Proof-of-Agent verification before launch
- * - Customizable bonding curves (linear, exponential, market cap)
- * - Automatic graduation to Meteora AMM
- * - Milestone-based team vesting
- * - 80/20 fee split (creator/platform)
- * 
- * Quick Start:
+ * MoltLaunch V3 SDK — Composable Signal Architecture
+ *
+ * On-chain AI agent identity with multi-authority attestations,
+ * trust scores, and permissionless signal refresh.
+ *
+ * Program: 6AZSAhq4iJTwCfGEVssoa1p3GnBqGkbcQ1iDdP1U1pSb (Solana Devnet)
+ *
+ * @example
  * ```typescript
- * import { MoltLauncher, AgentProfile } from '@moltlaunch/sdk';
- * 
- * const agent: AgentProfile = {
- *   name: 'TradingBot Pro',
- *   symbol: 'TBP',
- *   description: 'Autonomous trading agent with proven alpha generation',
- *   capabilities: ['trading', 'analysis', 'automation'],
- *   apiEndpoint: 'https://tradingbot.example.com/api',
- *   githubRepo: 'https://github.com/example/tradingbot',
- * };
- * 
- * const launcher = new MoltLauncher({
- *   rpcUrl: 'https://api.devnet.solana.com',
- *   payer: yourKeypair,
- *   dryRun: true,
- * });
- * 
- * const result = await launcher.launchAgent(agent, {
- *   targetRaise: 500, // SOL
- *   curveType: 'exponential',
- * });
+ * import { MoltLaunchClient, SignalType } from "@moltlaunch/sdk";
+ *
+ * const client = new MoltLaunchClient();
+ *
+ * // Read any agent's trust signals (no wallet needed)
+ * const agent = await client.getAgentIdentity(agentPubkey);
+ * console.log(agent.trustScore, agent.infraType, agent.isFlagged);
+ *
+ * // Register a new agent (signer = the agent wallet)
+ * const txId = await client.registerAgent("my-agent", walletKeypair);
+ *
+ * // Submit an attestation (signer = authority)
+ * await client.submitAttestation(
+ *   agentPubkey,
+ *   SignalType.InfraCloud,
+ *   attestationHash,
+ *   expiresAt,
+ *   authorityKeypair,
+ * );
+ *
+ * // Refresh signals (permissionless — anyone can call)
+ * await client.refreshSignals(agentPubkey);
  * ```
+ *
+ * @packageDocumentation
  */
 
-export default {
-  MoltLauncher,
-  AgentVerifier,
-  quickLaunch,
-  verifier,
-  config: MOLTLAUNCH_CONFIG,
-  programId: DBC_PROGRAM_ID,
-};
+// Re-export everything
+export {
+  // Enums
+  InfraType,
+  SignalType,
+  AuthorityType,
+  // Account interfaces
+  ProtocolConfig,
+  AgentIdentity,
+  Authority,
+  Attestation,
+  // Constants
+  MOLTLAUNCH_PROGRAM_ID,
+  DEVNET_RPC,
+  SEEDS,
+  // Helpers
+  toAnchorEnum,
+} from "./types";
+
+export {
+  findConfigPda,
+  findAgentPda,
+  findAuthorityPda,
+  findAttestationPda,
+} from "./pda";
+
+export { MoltLaunchClient } from "./client";
+export type { MoltLaunchClientOptions } from "./client";
+
+// Default export for convenience
+export { MoltLaunchClient as default } from "./client";
 
 // Version
-export const VERSION = '1.0.0';
+export const VERSION = "3.0.0";

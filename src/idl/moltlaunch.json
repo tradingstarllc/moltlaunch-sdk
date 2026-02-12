@@ -1,0 +1,1549 @@
+{
+  "address": "6AZSAhq4iJTwCfGEVssoa1p3GnBqGkbcQ1iDdP1U1pSb",
+  "metadata": {
+    "name": "moltlaunch",
+    "version": "0.1.0",
+    "spec": "0.1.0",
+    "description": "MoltLaunch V3 — Composable Signal Architecture for AI Agent Identity"
+  },
+  "instructions": [
+    {
+      "name": "add_authority",
+      "discriminator": [
+        229,
+        9,
+        106,
+        73,
+        91,
+        213,
+        109,
+        183
+      ],
+      "accounts": [
+        {
+          "name": "config",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  109,
+                  111,
+                  108,
+                  116,
+                  108,
+                  97,
+                  117,
+                  110,
+                  99,
+                  104
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "authority",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  97,
+                  117,
+                  116,
+                  104,
+                  111,
+                  114,
+                  105,
+                  116,
+                  121
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "authority_pubkey"
+              }
+            ]
+          }
+        },
+        {
+          "name": "authority_pubkey"
+        },
+        {
+          "name": "admin",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "authority_type",
+          "type": {
+            "defined": {
+              "name": "AuthorityType"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "close_attestation",
+      "discriminator": [
+        249,
+        84,
+        133,
+        23,
+        48,
+        175,
+        252,
+        221
+      ],
+      "accounts": [
+        {
+          "name": "attestation",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  97,
+                  116,
+                  116,
+                  101,
+                  115,
+                  116,
+                  97,
+                  116,
+                  105,
+                  111,
+                  110
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "attestation.agent",
+                "account": "Attestation"
+              },
+              {
+                "kind": "account",
+                "path": "attestation.authority",
+                "account": "Attestation"
+              }
+            ]
+          }
+        },
+        {
+          "name": "authority_signer",
+          "writable": true,
+          "signer": true
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "flag_agent",
+      "discriminator": [
+        235,
+        111,
+        155,
+        252,
+        101,
+        79,
+        59,
+        219
+      ],
+      "accounts": [
+        {
+          "name": "config",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  109,
+                  111,
+                  108,
+                  116,
+                  108,
+                  97,
+                  117,
+                  110,
+                  99,
+                  104
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "authority",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  97,
+                  117,
+                  116,
+                  104,
+                  111,
+                  114,
+                  105,
+                  116,
+                  121
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "authority_signer"
+              }
+            ]
+          }
+        },
+        {
+          "name": "agent",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  97,
+                  103,
+                  101,
+                  110,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "agent.wallet",
+                "account": "AgentIdentity"
+              }
+            ]
+          }
+        },
+        {
+          "name": "authority_signer",
+          "signer": true
+        }
+      ],
+      "args": [
+        {
+          "name": "reason_hash",
+          "type": {
+            "array": [
+              "u8",
+              32
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "initialize",
+      "discriminator": [
+        175,
+        175,
+        109,
+        31,
+        13,
+        152,
+        155,
+        237
+      ],
+      "accounts": [
+        {
+          "name": "config",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  109,
+                  111,
+                  108,
+                  116,
+                  108,
+                  97,
+                  117,
+                  110,
+                  99,
+                  104
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "admin",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "refresh_identity_signals",
+      "discriminator": [
+        192,
+        171,
+        41,
+        249,
+        54,
+        12,
+        114,
+        128
+      ],
+      "accounts": [
+        {
+          "name": "config",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  109,
+                  111,
+                  108,
+                  116,
+                  108,
+                  97,
+                  117,
+                  110,
+                  99,
+                  104
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "agent",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  97,
+                  103,
+                  101,
+                  110,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "agent.wallet",
+                "account": "AgentIdentity"
+              }
+            ]
+          }
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "register_agent",
+      "discriminator": [
+        135,
+        157,
+        66,
+        195,
+        2,
+        113,
+        175,
+        30
+      ],
+      "accounts": [
+        {
+          "name": "config",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  109,
+                  111,
+                  108,
+                  116,
+                  108,
+                  97,
+                  117,
+                  110,
+                  99,
+                  104
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "agent",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  97,
+                  103,
+                  101,
+                  110,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "wallet"
+              }
+            ]
+          }
+        },
+        {
+          "name": "wallet",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "name",
+          "type": "string"
+        }
+      ]
+    },
+    {
+      "name": "remove_authority",
+      "discriminator": [
+        242,
+        104,
+        208,
+        132,
+        190,
+        250,
+        74,
+        216
+      ],
+      "accounts": [
+        {
+          "name": "config",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  109,
+                  111,
+                  108,
+                  116,
+                  108,
+                  97,
+                  117,
+                  110,
+                  99,
+                  104
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "authority",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  97,
+                  117,
+                  116,
+                  104,
+                  111,
+                  114,
+                  105,
+                  116,
+                  121
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "authority.pubkey",
+                "account": "Authority"
+              }
+            ]
+          }
+        },
+        {
+          "name": "admin",
+          "signer": true
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "revoke_attestation",
+      "discriminator": [
+        12,
+        156,
+        103,
+        161,
+        194,
+        246,
+        211,
+        179
+      ],
+      "accounts": [
+        {
+          "name": "config",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  109,
+                  111,
+                  108,
+                  116,
+                  108,
+                  97,
+                  117,
+                  110,
+                  99,
+                  104
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "attestation",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  97,
+                  116,
+                  116,
+                  101,
+                  115,
+                  116,
+                  97,
+                  116,
+                  105,
+                  111,
+                  110
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "attestation.agent",
+                "account": "Attestation"
+              },
+              {
+                "kind": "account",
+                "path": "attestation.authority",
+                "account": "Attestation"
+              }
+            ]
+          }
+        },
+        {
+          "name": "authority_signer",
+          "signer": true
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "set_paused",
+      "discriminator": [
+        91,
+        60,
+        125,
+        192,
+        176,
+        225,
+        166,
+        218
+      ],
+      "accounts": [
+        {
+          "name": "config",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  109,
+                  111,
+                  108,
+                  116,
+                  108,
+                  97,
+                  117,
+                  110,
+                  99,
+                  104
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "admin",
+          "signer": true
+        }
+      ],
+      "args": [
+        {
+          "name": "paused",
+          "type": "bool"
+        }
+      ]
+    },
+    {
+      "name": "submit_attestation",
+      "discriminator": [
+        238,
+        220,
+        255,
+        105,
+        183,
+        211,
+        40,
+        83
+      ],
+      "accounts": [
+        {
+          "name": "config",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  109,
+                  111,
+                  108,
+                  116,
+                  108,
+                  97,
+                  117,
+                  110,
+                  99,
+                  104
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "authority",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  97,
+                  117,
+                  116,
+                  104,
+                  111,
+                  114,
+                  105,
+                  116,
+                  121
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "authority_signer"
+              }
+            ]
+          }
+        },
+        {
+          "name": "agent",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  97,
+                  103,
+                  101,
+                  110,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "agent.wallet",
+                "account": "AgentIdentity"
+              }
+            ]
+          }
+        },
+        {
+          "name": "attestation",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  97,
+                  116,
+                  116,
+                  101,
+                  115,
+                  116,
+                  97,
+                  116,
+                  105,
+                  111,
+                  110
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "agent.wallet",
+                "account": "AgentIdentity"
+              },
+              {
+                "kind": "account",
+                "path": "authority_signer"
+              }
+            ]
+          }
+        },
+        {
+          "name": "authority_signer",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "signal_type",
+          "type": {
+            "defined": {
+              "name": "SignalType"
+            }
+          }
+        },
+        {
+          "name": "attestation_hash",
+          "type": {
+            "array": [
+              "u8",
+              32
+            ]
+          }
+        },
+        {
+          "name": "tee_quote",
+          "type": {
+            "option": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          }
+        },
+        {
+          "name": "expires_at",
+          "type": "i64"
+        }
+      ]
+    },
+    {
+      "name": "transfer_admin",
+      "discriminator": [
+        42,
+        242,
+        66,
+        106,
+        228,
+        10,
+        111,
+        156
+      ],
+      "accounts": [
+        {
+          "name": "config",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  109,
+                  111,
+                  108,
+                  116,
+                  108,
+                  97,
+                  117,
+                  110,
+                  99,
+                  104
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "admin",
+          "signer": true
+        }
+      ],
+      "args": [
+        {
+          "name": "new_admin",
+          "type": "pubkey"
+        }
+      ]
+    },
+    {
+      "name": "unflag_agent",
+      "discriminator": [
+        154,
+        213,
+        255,
+        157,
+        177,
+        64,
+        122,
+        85
+      ],
+      "accounts": [
+        {
+          "name": "config",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  109,
+                  111,
+                  108,
+                  116,
+                  108,
+                  97,
+                  117,
+                  110,
+                  99,
+                  104
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "agent",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  97,
+                  103,
+                  101,
+                  110,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "agent.wallet",
+                "account": "AgentIdentity"
+              }
+            ]
+          }
+        },
+        {
+          "name": "admin",
+          "signer": true
+        }
+      ],
+      "args": []
+    }
+  ],
+  "accounts": [
+    {
+      "name": "AgentIdentity",
+      "discriminator": [
+        11,
+        149,
+        31,
+        27,
+        186,
+        76,
+        241,
+        72
+      ]
+    },
+    {
+      "name": "Attestation",
+      "discriminator": [
+        152,
+        125,
+        183,
+        86,
+        36,
+        146,
+        121,
+        73
+      ]
+    },
+    {
+      "name": "Authority",
+      "discriminator": [
+        36,
+        108,
+        254,
+        18,
+        167,
+        144,
+        27,
+        36
+      ]
+    },
+    {
+      "name": "ProtocolConfig",
+      "discriminator": [
+        207,
+        91,
+        250,
+        28,
+        152,
+        179,
+        215,
+        209
+      ]
+    }
+  ],
+  "events": [
+    {
+      "name": "AgentFlagged",
+      "discriminator": [
+        233,
+        147,
+        162,
+        100,
+        245,
+        61,
+        175,
+        85
+      ]
+    },
+    {
+      "name": "AgentRegistered",
+      "discriminator": [
+        191,
+        78,
+        217,
+        54,
+        232,
+        100,
+        189,
+        85
+      ]
+    },
+    {
+      "name": "AgentUnflagged",
+      "discriminator": [
+        192,
+        185,
+        66,
+        72,
+        56,
+        134,
+        16,
+        37
+      ]
+    },
+    {
+      "name": "AttestationRevoked",
+      "discriminator": [
+        47,
+        106,
+        65,
+        238,
+        200,
+        127,
+        163,
+        50
+      ]
+    },
+    {
+      "name": "AttestationSubmitted",
+      "discriminator": [
+        177,
+        213,
+        117,
+        225,
+        166,
+        11,
+        54,
+        218
+      ]
+    },
+    {
+      "name": "AuthorityAdded",
+      "discriminator": [
+        50,
+        148,
+        144,
+        211,
+        13,
+        58,
+        69,
+        166
+      ]
+    },
+    {
+      "name": "AuthorityRemoved",
+      "discriminator": [
+        141,
+        173,
+        114,
+        187,
+        213,
+        168,
+        90,
+        182
+      ]
+    },
+    {
+      "name": "TrustScoreRefreshed",
+      "discriminator": [
+        111,
+        239,
+        179,
+        205,
+        136,
+        70,
+        213,
+        176
+      ]
+    }
+  ],
+  "errors": [
+    {
+      "code": 6000,
+      "name": "Unauthorized",
+      "msg": "Unauthorized"
+    },
+    {
+      "code": 6001,
+      "name": "AgentAlreadyRegistered",
+      "msg": "Agent already registered"
+    },
+    {
+      "code": 6002,
+      "name": "AgentNotFound",
+      "msg": "Agent not found"
+    },
+    {
+      "code": 6003,
+      "name": "AuthorityNotActive",
+      "msg": "Authority is not active"
+    },
+    {
+      "code": 6004,
+      "name": "AttestationAlreadyExists",
+      "msg": "Attestation already exists"
+    },
+    {
+      "code": 6005,
+      "name": "AttestationExpired",
+      "msg": "Attestation has expired"
+    },
+    {
+      "code": 6006,
+      "name": "AgentFlagged",
+      "msg": "Agent is flagged"
+    },
+    {
+      "code": 6007,
+      "name": "ProtocolPaused",
+      "msg": "Protocol is paused"
+    },
+    {
+      "code": 6008,
+      "name": "NameTooLong",
+      "msg": "Name too long (max 32 characters)"
+    },
+    {
+      "code": 6009,
+      "name": "InvalidSignalType",
+      "msg": "Invalid signal type"
+    },
+    {
+      "code": 6010,
+      "name": "AttestationNotRevoked",
+      "msg": "Attestation is not revoked"
+    }
+  ],
+  "types": [
+    {
+      "name": "AgentFlagged",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "agent",
+            "type": "pubkey"
+          },
+          {
+            "name": "authority",
+            "type": "pubkey"
+          },
+          {
+            "name": "reason_hash",
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "AgentIdentity",
+      "docs": [
+        "AgentIdentity — the composable signal hub. Seeds: [\"agent\", wallet]"
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "wallet",
+            "type": "pubkey"
+          },
+          {
+            "name": "infra_type",
+            "type": {
+              "defined": {
+                "name": "InfraType"
+              }
+            }
+          },
+          {
+            "name": "has_economic_stake",
+            "type": "bool"
+          },
+          {
+            "name": "has_hardware_binding",
+            "type": "bool"
+          },
+          {
+            "name": "attestation_count",
+            "type": "u8"
+          },
+          {
+            "name": "is_flagged",
+            "type": "bool"
+          },
+          {
+            "name": "trust_score",
+            "type": "u8"
+          },
+          {
+            "name": "last_verified",
+            "type": "i64"
+          },
+          {
+            "name": "nonce",
+            "type": "u64"
+          },
+          {
+            "name": "registered_at",
+            "type": "i64"
+          },
+          {
+            "name": "name",
+            "type": "string"
+          },
+          {
+            "name": "bump",
+            "type": "u8"
+          }
+        ]
+      }
+    },
+    {
+      "name": "AgentRegistered",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "wallet",
+            "type": "pubkey"
+          },
+          {
+            "name": "name",
+            "type": "string"
+          }
+        ]
+      }
+    },
+    {
+      "name": "AgentUnflagged",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "agent",
+            "type": "pubkey"
+          }
+        ]
+      }
+    },
+    {
+      "name": "Attestation",
+      "docs": [
+        "Attestation — one per (agent, authority) pair.",
+        "Seeds: [\"attestation\", agent_wallet, authority_pubkey]"
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "agent",
+            "type": "pubkey"
+          },
+          {
+            "name": "authority",
+            "type": "pubkey"
+          },
+          {
+            "name": "authority_type",
+            "type": {
+              "defined": {
+                "name": "AuthorityType"
+              }
+            }
+          },
+          {
+            "name": "signal_contributed",
+            "type": {
+              "defined": {
+                "name": "SignalType"
+              }
+            }
+          },
+          {
+            "name": "attestation_hash",
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          },
+          {
+            "name": "tee_quote",
+            "type": {
+              "option": {
+                "array": [
+                  "u8",
+                  32
+                ]
+              }
+            }
+          },
+          {
+            "name": "created_at",
+            "type": "i64"
+          },
+          {
+            "name": "expires_at",
+            "type": "i64"
+          },
+          {
+            "name": "revoked",
+            "type": "bool"
+          },
+          {
+            "name": "bump",
+            "type": "u8"
+          }
+        ]
+      }
+    },
+    {
+      "name": "AttestationRevoked",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "agent",
+            "type": "pubkey"
+          },
+          {
+            "name": "authority",
+            "type": "pubkey"
+          }
+        ]
+      }
+    },
+    {
+      "name": "AttestationSubmitted",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "agent",
+            "type": "pubkey"
+          },
+          {
+            "name": "authority",
+            "type": "pubkey"
+          },
+          {
+            "name": "signal_type",
+            "type": {
+              "defined": {
+                "name": "SignalType"
+              }
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "Authority",
+      "docs": [
+        "Authority — one per authorized verifier. Seeds: [\"authority\", pubkey]"
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "pubkey",
+            "type": "pubkey"
+          },
+          {
+            "name": "authority_type",
+            "type": {
+              "defined": {
+                "name": "AuthorityType"
+              }
+            }
+          },
+          {
+            "name": "attestation_count",
+            "type": "u64"
+          },
+          {
+            "name": "active",
+            "type": "bool"
+          },
+          {
+            "name": "added_by",
+            "type": "pubkey"
+          },
+          {
+            "name": "added_at",
+            "type": "i64"
+          },
+          {
+            "name": "bump",
+            "type": "u8"
+          }
+        ]
+      }
+    },
+    {
+      "name": "AuthorityAdded",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "authority",
+            "type": "pubkey"
+          },
+          {
+            "name": "authority_type",
+            "type": {
+              "defined": {
+                "name": "AuthorityType"
+              }
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "AuthorityRemoved",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "authority",
+            "type": "pubkey"
+          }
+        ]
+      }
+    },
+    {
+      "name": "AuthorityType",
+      "type": {
+        "kind": "enum",
+        "variants": [
+          {
+            "name": "Single"
+          },
+          {
+            "name": "MultisigMember"
+          },
+          {
+            "name": "OracleOperator"
+          },
+          {
+            "name": "NCNValidator"
+          }
+        ]
+      }
+    },
+    {
+      "name": "InfraType",
+      "type": {
+        "kind": "enum",
+        "variants": [
+          {
+            "name": "Unknown"
+          },
+          {
+            "name": "Cloud"
+          },
+          {
+            "name": "TEE"
+          },
+          {
+            "name": "DePIN"
+          }
+        ]
+      }
+    },
+    {
+      "name": "ProtocolConfig",
+      "docs": [
+        "Singleton protocol configuration — seeds: [\"moltlaunch\"]"
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "admin",
+            "type": "pubkey"
+          },
+          {
+            "name": "revocation_nonce",
+            "type": "u64"
+          },
+          {
+            "name": "total_agents",
+            "type": "u64"
+          },
+          {
+            "name": "total_attestations",
+            "type": "u64"
+          },
+          {
+            "name": "paused",
+            "type": "bool"
+          },
+          {
+            "name": "bump",
+            "type": "u8"
+          }
+        ]
+      }
+    },
+    {
+      "name": "SignalType",
+      "type": {
+        "kind": "enum",
+        "variants": [
+          {
+            "name": "InfraCloud"
+          },
+          {
+            "name": "InfraTEE"
+          },
+          {
+            "name": "InfraDePIN"
+          },
+          {
+            "name": "EconomicStake"
+          },
+          {
+            "name": "HardwareBinding"
+          },
+          {
+            "name": "General"
+          }
+        ]
+      }
+    },
+    {
+      "name": "TrustScoreRefreshed",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "agent",
+            "type": "pubkey"
+          },
+          {
+            "name": "old_score",
+            "type": "u8"
+          },
+          {
+            "name": "new_score",
+            "type": "u8"
+          }
+        ]
+      }
+    }
+  ]
+}

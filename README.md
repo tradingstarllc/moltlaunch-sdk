@@ -3,7 +3,7 @@
 </p>
 
 <p align="center">
-  <strong>Hardware-anchored identity, STARK proofs, and Sybil detection for AI agents on Solana</strong>
+  <strong>Composable Signal Architecture for AI Agent Identity on Solana</strong>
 </p>
 
 <p align="center">
@@ -14,355 +14,259 @@
 
 ---
 
+## V3 — Composable Signal Architecture
+
+MoltLaunch V3 replaces centralized scoring with **on-chain composable signals**. Multiple independent authorities submit attestations about an agent's infrastructure, economic stake, and hardware binding. Trust scores are derived permissionlessly from these attestations.
+
+**Program:** `6AZSAhq4iJTwCfGEVssoa1p3GnBqGkbcQ1iDdP1U1pSb` (Solana Devnet)
+
+---
+
 ## Install
 
 ```bash
 npm install @moltlaunch/sdk
 ```
 
-## What It Does
+## Architecture
 
-| Feature | Description |
-|---------|-------------|
-| **Hardware Identity** | Tie agent identity to physical hardware — CPU, TPM, DePIN devices |
-| **Sybil Detection** | Detect duplicate agents sharing the same infrastructure |
-| **Agent Verification** | Score agents 0-100 with on-chain AI |
-| **STARK Proofs** | Prove "score ≥ 60" without revealing the actual score |
-| **Behavioral Scoring** | Track agent behavior over time via execution traces |
-| **On-Chain Anchoring** | Write attestations to Solana (Memo program) |
-| **DePIN Integration** | Link identity to io.net, Akash, Render, Helium, Nosana |
+```
+                        ┌─────────────────┐
+                        │  ProtocolConfig  │
+                        │  (singleton)     │
+                        └────────┬────────┘
+                                 │
+              ┌──────────────────┼──────────────────┐
+              ▼                  ▼                   ▼
+      ┌──────────────┐  ┌──────────────┐   ┌──────────────┐
+      │  Authority A  │  │  Authority B  │   │  Authority C  │
+      │  (Single)     │  │  (Oracle)     │   │  (NCN)        │
+      └──────┬───────┘  └──────┬───────┘   └──────┬───────┘
+             │                  │                   │
+             ▼                  ▼                   ▼
+      ┌─────────────────────────────────────────────────┐
+      │              Attestation Layer                   │
+      │  (one per agent × authority pair)                │
+      │  signal_type · hash · tee_quote · expires_at     │
+      └──────────────────────┬──────────────────────────┘
+                             │
+                             ▼
+                   ┌──────────────────┐
+                   │  AgentIdentity   │
+                   │  (signal hub)    │
+                   │                  │
+                   │  trust_score     │
+                   │  infra_type      │
+                   │  economic_stake  │
+                   │  hardware_bind   │
+                   │  attestation_cnt │
+                   │  is_flagged      │
+                   └──────────────────┘
+```
 
 ---
 
 ## Quick Start
 
-```typescript
-import { MoltLaunch } from "@moltlaunch/sdk";
-const ml = new MoltLaunch();
+### Read Agent Identity (No Wallet Needed)
 
-// Verify an agent
-const result = await ml.verify({
-    agentId: "my-agent",
-    capabilities: ["trading"],
-    codeUrl: "https://github.com/org/repo"
+```typescript
+import { MoltLaunchClient } from "@moltlaunch/sdk";
+import { PublicKey } from "@solana/web3.js";
+
+const client = new MoltLaunchClient(); // defaults to devnet
+
+const agent = await client.getAgentIdentity(
+  new PublicKey("AgentWalletPubkey...")
+);
+
+console.log(`Trust Score: ${agent.trustScore}/100`);
+console.log(`Infra Type:  ${agent.infraType}`);
+console.log(`Attestations: ${agent.attestationCount}`);
+console.log(`Flagged: ${agent.isFlagged}`);
+console.log(`Economic Stake: ${agent.hasEconomicStake}`);
+console.log(`Hardware Binding: ${agent.hasHardwareBinding}`);
+```
+
+### Register an Agent
+
+```typescript
+import { Keypair } from "@solana/web3.js";
+import { MoltLaunchClient } from "@moltlaunch/sdk";
+
+const wallet = Keypair.generate();
+const client = new MoltLaunchClient({
+  wallet: { publicKey: wallet.publicKey, signTransaction: ..., signAllTransactions: ... },
 });
 
-console.log(result.score);     // 78
-console.log(result.tier);      // "good"
-console.log(result.verified);  // true
+const txId = await client.registerAgent("my-agent", wallet);
+console.log(`Registered! TX: ${txId}`);
+```
+
+### Submit an Attestation (Authority)
+
+```typescript
+import { MoltLaunchClient, SignalType } from "@moltlaunch/sdk";
+
+const client = new MoltLaunchClient({ wallet: authorityWallet });
+
+// 32-byte attestation hash (e.g. SHA-256 of evidence)
+const attestationHash = new Uint8Array(32);
+crypto.getRandomValues(attestationHash);
+
+// Expires in 30 days
+const expiresAt = Math.floor(Date.now() / 1000) + 30 * 24 * 60 * 60;
+
+const txId = await client.submitAttestation(
+  agentPubkey,           // agent's wallet pubkey
+  SignalType.InfraCloud, // signal type
+  attestationHash,       // 32-byte hash
+  expiresAt,             // unix timestamp
+  authorityKeypair,      // authority signs
+);
+```
+
+### Refresh Signals (Permissionless)
+
+```typescript
+// Anyone can call this — no authority needed
+const txId = await client.refreshSignals(agentPubkey);
+```
+
+### Flag an Agent (Authority)
+
+```typescript
+const reasonHash = new Uint8Array(32); // SHA-256 of reason
+const txId = await client.flagAgent(agentPubkey, reasonHash, authorityKeypair);
+```
+
+### Revoke an Attestation
+
+```typescript
+const txId = await client.revokeAttestation(agentPubkey, authorityKeypair);
 ```
 
 ---
 
-## 🔑 Hardware-Anchored Identity (Anti-Sybil)
-
-The core feature. Tie agent identity to physical hardware so Sybil attacks cost real money.
-
-### Generate Identity
+## PDA Derivation
 
 ```typescript
-const identity = await ml.generateIdentity({
-    includeHardware: true,   // CPU, memory, hostname
-    includeRuntime: true,    // Node version, OS
-    includeCode: true,       // SHA-256 of agent's main file
-    includeTPM: true,        // TPM endorsement key (if available)
-    codeEntry: "./index.js",
-    agentId: "my-agent",
-    anchor: true             // Write to Solana
-});
+import {
+  findConfigPda,
+  findAgentPda,
+  findAuthorityPda,
+  findAttestationPda,
+} from "@moltlaunch/sdk";
 
-console.log(identity.hash);        // "7f04b937d885..."
-console.log(identity.trustLevel);  // 3 (hardware-anchored)
-console.log(identity.anchored);    // true
-console.log(identity.anchorExplorer); // Solana explorer link
+const [configPda]      = findConfigPda();
+const [agentPda]       = findAgentPda(walletPubkey);
+const [authorityPda]   = findAuthorityPda(authorityPubkey);
+const [attestationPda] = findAttestationPda(agentWallet, authorityPubkey);
 ```
 
-Same machine + same code = **same identity hash**. Can't fake 10 different agents on one server.
-
-### Trust Levels
-
-| Level | Method | Sybil Cost |
-|-------|--------|------------|
-| 0 | None | $0 |
-| 1 | API key | $0 |
-| 2 | Code hash | $0 |
-| 3 | **Hardware fingerprint** | **$100/mo** |
-| 4 | **TPM attestation** | **$200+/mo** |
-| 5 | **DePIN device** | **$500+/mo** |
-
-### Check Two Agents for Sybil
-
-```typescript
-const result = await ml.checkSybil("agent-1", "agent-2");
-
-// {
-//   sameIdentity: true,
-//   sybilRisk: "HIGH",
-//   reason: "Same hardware fingerprint — likely same operator",
-//   recommendation: "Do not seat at same table"
-// }
-```
-
-### Check a Table (Multi-Agent)
-
-```typescript
-const table = await ml.checkTableSybils([
-    "BluffMaster", "TightBot", "AggroAlice",
-    "SuspiciousBot", "FishBot", "NitNancy"
-]);
-
-// {
-//   safe: false,
-//   sybilClusters: [["BluffMaster", "SuspiciousBot"]],
-//   flaggedAgents: ["BluffMaster", "SuspiciousBot"],
-//   recommendation: "1 Sybil cluster — 2 agents share hardware"
-// }
-```
-
-### DePIN Device Registration
-
-```typescript
-await ml.registerDePINDevice({
-    provider: "io.net",        // or: akash, render, helium, hivemapper, nosana
-    deviceId: "device_abc123",
-    agentId: "my-agent"
-});
-// Trust level → 5 (highest)
-```
-
-### Identity Report
-
-```typescript
-const report = await ml.getIdentityReport("my-agent");
-
-// {
-//   trustLevel: 3,
-//   trustLadder: {
-//     level0: { status: "passed" },
-//     level1: { status: "passed" },
-//     level2: { status: "passed" },
-//     level3: { status: "passed", description: "Hardware fingerprint" },
-//     level4: { status: "missing", description: "TPM attestation" },
-//     level5: { status: "missing", description: "DePIN device" }
-//   },
-//   sybilResistance: { current: "$100/mo", level: 3, maxLevel: 5 }
-// }
-```
+| PDA | Seeds |
+|-----|-------|
+| `ProtocolConfig` | `["moltlaunch"]` |
+| `AgentIdentity` | `["agent", wallet]` |
+| `Authority` | `["authority", pubkey]` |
+| `Attestation` | `["attestation", agent_wallet, authority_pubkey]` |
 
 ---
 
-## 🔐 STARK Proofs (Privacy-Preserving)
+## On-Chain Types
 
-Prove properties about your agent without revealing the underlying data.
+### InfraType
+| Variant | Description |
+|---------|-------------|
+| `Unknown` | No infrastructure attestation yet |
+| `Cloud` | Standard cloud infrastructure |
+| `TEE` | Trusted Execution Environment |
+| `DePIN` | Decentralized Physical Infrastructure |
 
-### Threshold Proof
+### SignalType
+| Variant | Description |
+|---------|-------------|
+| `InfraCloud` | Cloud infrastructure attestation |
+| `InfraTEE` | TEE attestation (with optional quote) |
+| `InfraDePIN` | DePIN device attestation |
+| `EconomicStake` | Economic stake verification |
+| `HardwareBinding` | Hardware binding attestation |
+| `General` | General-purpose attestation |
 
-```typescript
-// Prove "score >= 60" without revealing exact score
-const proof = await ml.generateProof("my-agent", { threshold: 60 });
-
-console.log(proof.valid);           // true
-console.log(proof.claim);           // "Score >= 60"
-console.log(proof.proof.commitment); // cryptographic commitment
-// Verifier knows: passed 60. Doesn't know: scored 61 or 99.
-```
-
-### Consistency Proof
-
-```typescript
-// Prove "maintained >= 60 for 30 days"
-const proof = await ml.generateConsistencyProof("my-agent", {
-    threshold: 60,
-    days: 30
-});
-// Hides individual daily scores
-```
-
-### Streak Proof
-
-```typescript
-// Prove "7+ consecutive periods above threshold"
-const proof = await ml.generateStreakProof("my-agent", {
-    threshold: 60,
-    minStreak: 7
-});
-```
-
-### Stability Proof
-
-```typescript
-// Prove "score variance stayed below 100"
-const proof = await ml.generateStabilityProof("my-agent", {
-    maxVariance: 100
-});
-```
+### AuthorityType
+| Variant | Description |
+|---------|-------------|
+| `Single` | Single-signer authority |
+| `MultisigMember` | Member of a multisig |
+| `OracleOperator` | Oracle-based operator |
+| `NCNValidator` | Jito NCN validator |
 
 ---
 
-## 📊 Execution Traces (Behavioral Scoring)
+## Consumer Integration
 
-Submit behavioral data to build continuous reputation.
-
-### Submit a Trace
+Any protocol can read agent trust signals to make access decisions:
 
 ```typescript
-const trace = await ml.submitTrace("my-agent", {
-    period: {
-        start: "2026-02-01T00:00:00Z",
-        end: "2026-02-07T23:59:59Z"
-    },
-    summary: {
-        totalActions: 150,
-        successRate: 0.92,
-        tradesExecuted: 45,
-        winRate: 0.73
-    }
-});
+import { MoltLaunchClient, InfraType } from "@moltlaunch/sdk";
 
-console.log(trace.traceId);        // "trace_abc123"
-console.log(trace.commitment);      // Merkle root
-console.log(trace.onChainAnchor);   // { signature, explorer } (auto-anchored)
-```
+const client = new MoltLaunchClient();
+const agent = await client.getAgentIdentity(wallet);
 
-### Get Behavioral Score
-
-```typescript
-const score = await ml.getBehavioralScore("my-agent");
-// { score: 22, breakdown: { hasTraces: 5, verified: 5, ... }, traceCount: 12 }
-```
-
-### Anchor Trace On-Chain
-
-```typescript
-const anchor = await ml.anchorTrace("trace_abc123");
-// { anchored: true, txSignature: "4EXao...", slot: 12345678 }
-```
-
----
-
-## 🧠 Agent Verification
-
-### Deep Verification
-
-```typescript
-const result = await ml.verify({
-    agentId: "my-agent",
-    wallet: "SolanaAddress",
-    capabilities: ["trading", "analysis"],
-    codeUrl: "https://github.com/org/repo",
-    documentation: true,
-    testCoverage: 85,
-    codeLines: 3000
-});
-
-// {
-//   verified: true,
-//   score: 78,
-//   tier: "good",        // excellent (80+) | good (60+) | needs_work (40+) | poor
-//   onChainAI: { enabled: true, executedOnChain: true },
-//   attestation: { hash: "abc123...", expiresAt: "2026-03-10" }
-// }
-```
-
-### Quick Checks
-
-```typescript
-// Boolean check
-if (await ml.isVerified("agent-id")) { ... }
-
-// Capability check with minimum score
-const canTrade = await ml.checkCapability("agent-id", "trading", 70);
-
-// Batch status
-const batch = await ml.getStatusBatch(["agent-1", "agent-2", "agent-3"]);
-```
-
----
-
-## ⛓️ On-Chain AI
-
-Verification scoring runs on Solana via Cauldron/Frostbite RISC-V VM.
-
-```
-Network:  Solana Devnet
-VM:       FHcy35f4NGZK9b6j5TGMYstfB6PXEtmNbMLvjfR1y2Li
-Program:  FRsToriMLgDc1Ud53ngzHUZvCRoazCaGeGUuzkwoha7m
-```
-
-```typescript
-const info = await ml.getOnChainInfo();
+if (agent.infraType === InfraType.TEE && agent.hasEconomicStake) {
+  grantFlashLoan();      // High trust — TEE + economic skin in the game
+} else if (agent.trustScore >= 30) {
+  grantBasicAccess();    // Medium trust — at least one attestation
+} else {
+  deny();                // Unverified — no attestations
+}
 ```
 
 ---
 
 ## API Reference
 
-| Method | Description |
-|--------|-------------|
-| **Identity** | |
-| `generateIdentity(opts)` | Generate hardware-anchored identity hash |
-| `verifyIdentity(agentId)` | Verify agent against registered fingerprint |
-| `checkSybil(id1, id2)` | Compare two agents for Sybil |
-| `checkTableSybils(ids[])` | Check group for Sybil clusters |
-| `registerDePINDevice(opts)` | Register DePIN device attestation |
-| `getIdentityReport(agentId)` | Get trust ladder breakdown |
-| **Verification** | |
-| `verify(opts)` | Deep verification with on-chain AI |
-| `verifySecure(opts)` | Replay-protected verification |
-| `getStatus(agentId)` | Check verification status |
-| `getStatusBatch(ids[])` | Batch status check |
-| `isVerified(agentId)` | Quick boolean check |
-| `checkCapability(id, cap, min)` | Capability + score check |
-| `checkRevocation(hash)` | Check attestation revocation |
-| `renew(agentId)` | Renew verification |
-| **STARK Proofs** | |
-| `generateProof(id, opts)` | Threshold proof |
-| `generateConsistencyProof(id, opts)` | Time-series proof |
-| `generateStreakProof(id, opts)` | Consecutive period proof |
-| `generateStabilityProof(id, opts)` | Variance proof |
-| `getProofCost(type)` | Cost estimate |
-| **Traces** | |
-| `submitTrace(id, data)` | Submit behavioral data |
-| `getTraces(id, opts)` | Query trace history |
-| `getBehavioralScore(id)` | Get reputation score |
-| `anchorTrace(traceId)` | Anchor on-chain |
-| **Other** | |
-| `applyToPool(opts)` | Join staking pool |
-| `getPools(topic?)` | Get pool info |
-| `getLeaderboard()` | Agent rankings |
-| `getOnChainInfo()` | On-chain deployment info |
-| `isHealthy()` | API health check |
-| `generateNonce()` | Random nonce for replay protection |
+### MoltLaunchClient
+
+| Method | Description | Signer |
+|--------|-------------|--------|
+| `getConfig()` | Fetch protocol config | — |
+| `getAgentIdentity(wallet)` | Fetch agent signal hub | — |
+| `getAuthority(pubkey)` | Fetch authority account | — |
+| `getAttestation(agent, authority)` | Fetch attestation | — |
+| `registerAgent(name, keypair)` | Register new agent | Agent wallet |
+| `submitAttestation(...)` | Submit attestation | Authority |
+| `revokeAttestation(agent, authority)` | Revoke attestation | Authority |
+| `refreshSignals(agent)` | Refresh trust score | Anyone |
+| `flagAgent(agent, reason, authority)` | Flag an agent | Authority |
+| `unflagAgent(agent, admin)` | Unflag an agent | Admin |
+| `initialize(admin)` | Initialize protocol | Admin |
+| `addAuthority(pubkey, type, admin)` | Add authority | Admin |
+| `removeAuthority(pubkey, admin)` | Remove authority | Admin |
+| `setPaused(paused, admin)` | Pause/unpause | Admin |
+| `transferAdmin(newAdmin, admin)` | Transfer admin | Admin |
 
 ---
 
 ## Changelog
 
-### v2.4.0 (Current)
-- `_getTPMAttestation(challenge)` — Real TPM challenge-response
-- `verifyTPM(agentId)` — Full challenge-response flow
-- Updated DePIN registration with devicePDA verification
+### v3.0.0 (Current)
+- **Complete rewrite** for Composable Signal Architecture
+- On-chain program at `6AZSAhq4iJTwCfGEVssoa1p3GnBqGkbcQ1iDdP1U1pSb`
+- `registerAgent()` — creates AgentIdentity PDA
+- `submitAttestation()` — authority submits attestation with signal type
+- `revokeAttestation()` — authority revokes own attestation
+- `refreshSignals()` — permissionless trust score refresh
+- `flagAgent()` / `unflagAgent()` — authority/admin flagging
+- PDA derivation helpers
+- Full TypeScript types matching on-chain enums
+- Bundled IDL for Anchor integration
 
-### v2.3.0
-- `_getTPMFingerprint()` — TPM 2.0 hardware attestation
-- `registerDePINDevice()` — DePIN provider registration
-- `getIdentityReport()` — Trust ladder breakdown
-- TPM + DePIN integrated into `generateIdentity()`
-
-### v2.2.0
-- `generateIdentity()` — Hardware-anchored identity
-- `verifyIdentity()` — Identity verification
-- `checkSybil()` — Pairwise Sybil detection
-- `checkTableSybils()` — Multi-agent Sybil check
-
-### v2.1.0
-- STARK proofs (threshold, consistency, streak, stability)
-- Execution traces (submit, score, anchor)
-- Helper methods (`isVerified`, `checkCapability`, `getProofCost`)
+### v2.4.0
+- TPM challenge-response, DePIN registration
 
 ### v2.0.0
 - On-chain AI verification via Cauldron
-- Batch status checks, pool application
 
 ### v1.0.0
 - Initial release
@@ -374,11 +278,11 @@ const info = await ml.getOnChainInfo();
 | Resource | URL |
 |----------|-----|
 | npm | https://www.npmjs.com/package/@moltlaunch/sdk |
-| Live API | https://youragent.id |
+| Demo | https://youragent.id/demo.html |
 | Docs | https://youragent.id/docs.html |
-| skill.md | https://youragent.id/skill.md |
-| Registry | https://youragent.id/registry.html |
-| GitHub (main) | https://github.com/tradingstarllc/moltlaunch |
+| Explorer | https://explorer.solana.com/address/6AZSAhq4iJTwCfGEVssoa1p3GnBqGkbcQ1iDdP1U1pSb?cluster=devnet |
+| GitHub (program) | https://github.com/tradingstarllc/moltlaunch |
+| GitHub (SDK) | https://github.com/tradingstarllc/moltlaunch-sdk |
 | GitHub (site) | https://github.com/tradingstarllc/moltlaunch-site |
 
 ---

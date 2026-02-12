@@ -1,19 +1,23 @@
 {
   "name": "@moltlaunch/sdk",
-  "version": "2.4.0",
-  "description": "MoltLaunch SDK - On-chain AI verification for AI agents",
-  "main": "src/index.js",
-  "types": "src/index.d.ts",
+  "version": "3.0.0",
+  "description": "MoltLaunch V3 SDK — Composable Signal Architecture for AI Agent Identity on Solana",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
   "scripts": {
-    "test": "node test/basic.js"
+    "build": "tsc",
+    "test": "node test/basic.js",
+    "prepublishOnly": "npm run build"
   },
   "keywords": [
     "moltlaunch",
     "ai-agents",
-    "verification",
+    "identity",
     "solana",
-    "on-chain-ai",
-    "cauldron"
+    "composable-signals",
+    "trust-score",
+    "attestation",
+    "sybil-resistance"
   ],
   "author": "MoltLaunch",
   "license": "MIT",
@@ -23,5 +27,16 @@
   },
   "engines": {
     "node": ">=18"
-  }
+  },
+  "dependencies": {
+    "@coral-xyz/anchor": "^0.30.0",
+    "@solana/web3.js": "^1.95.0"
+  },
+  "devDependencies": {
+    "typescript": "^5.4.0"
+  },
+  "files": [
+    "dist",
+    "src/idl"
+  ]
 }
