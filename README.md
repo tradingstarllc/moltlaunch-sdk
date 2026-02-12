@@ -8,7 +8,7 @@
 
 <p align="center">
   <a href="https://www.npmjs.com/package/@moltlaunch/sdk"><img src="https://img.shields.io/npm/v/@moltlaunch/sdk" alt="npm" /></a>
-  <a href="https://web-production-419d9.up.railway.app"><img src="https://img.shields.io/badge/API-live-brightgreen" alt="API" /></a>
+  <a href="https://youragent.id"><img src="https://img.shields.io/badge/API-live-brightgreen" alt="API" /></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-green" alt="MIT" /></a>
 </p>
 
@@ -374,10 +374,10 @@ const info = await ml.getOnChainInfo();
 | Resource | URL |
 |----------|-----|
 | npm | https://www.npmjs.com/package/@moltlaunch/sdk |
-| Live API | https://web-production-419d9.up.railway.app |
-| Docs | https://web-production-419d9.up.railway.app/docs.html |
-| skill.md | https://web-production-419d9.up.railway.app/skill.md |
-| Registry | https://web-production-419d9.up.railway.app/registry.html |
+| Live API | https://youragent.id |
+| Docs | https://youragent.id/docs.html |
+| skill.md | https://youragent.id/skill.md |
+| Registry | https://youragent.id/registry.html |
 | GitHub (main) | https://github.com/tradingstarllc/moltlaunch |
 | GitHub (site) | https://github.com/tradingstarllc/moltlaunch-site |
 

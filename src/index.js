@@ -8,7 +8,7 @@
  * const result = await ml.verify({ agentId: 'my-agent', capabilities: ['trading'] });
  */
 
-const DEFAULT_BASE_URL = 'https://web-production-419d9.up.railway.app';
+const DEFAULT_BASE_URL = 'https://youragent.id';
 
 class MoltLaunch {
     /**
