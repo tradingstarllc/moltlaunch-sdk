@@ -1,6 +1,6 @@
 {
   "name": "@moltlaunch/sdk",
-  "version": "3.0.0",
+  "version": "3.0.1",
   "description": "MoltLaunch V3 SDK — Composable Signal Architecture for AI Agent Identity on Solana",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
